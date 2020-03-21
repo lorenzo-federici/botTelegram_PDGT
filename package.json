@@ -1,0 +1,26 @@
+{
+  "name": "bottelegram_pdgt",
+  "version": "1.0.0",
+  "description": "BotTelegram per progetto PDGT",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BillyPap3/botTelegram_PDGT.git"
+  },
+  "author": "Lorenzo Federici",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/BillyPap3/botTelegram_PDGT/issues"
+  },
+  "homepage": "https://github.com/BillyPap3/botTelegram_PDGT#readme",
+  "dependencies": {
+    "axios": "^0.19.2",
+    "dotenv": "^8.2.0",
+    "node-telegram-bot-api": "^0.40.0",
+    "nodemon": "^2.0.2"
+  }
+}
