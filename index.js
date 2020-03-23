@@ -174,23 +174,19 @@ bot.on('message', (msg) => {
         //------------------------------------------------------------------------
 
     }else if (where_i_am == 'Inside' && msg.text.toString().includes("➕Add")){
-        // PROOF GET_ADD_STATION--------------------------------------------------
-        //------------------------------------------------------------------------
+        let txt1 = "Tell me all station's information you want to add, you will have to write me: "
+        let txt2 = "\nNAME\nMUNICIPALITY\nPROVINCE\nREGION\nLONGITUDE\nLATITUDE\nID_OpenStreetMap (if you know it)\n\n"
+        let txt3 = "You must write all infos divided by a space."
+        bot.sendMessage(msg.chat.id, txt1+txt2+txt3)
+        where_i_am = "➕Add";
     }else if (where_i_am == 'Inside' && msg.text.toString().includes("📝Modify")){
         // PROOF GET_PATCH_STATION--------------------------------------------------
         //------------------------------------------------------------------------
     }else if (where_i_am == 'Inside' && msg.text.toString().includes("❌Delete")){
-        // PROOF GET_DELETE_STATION--------------------------------------------------
-        let id_st = "5e6f9fbfa509220612ef49fc"
-        axios.get(URL + '/stations/'+ id_st)
-        .then((response) => {
-            let txt = "Here is the point of " + response.data.station.Nome + "'s station:"
-            bot.sendMessage(msg.chat.id, txt);
-            bot.sendLocation(msg.chat.id, 
-                            response.data.station.Latitudine,
-                            response.data.station.Longitudine);
-        });
-        //------------------------------------------------------------------------
+        where_i_am = "❌Delete";
+
+        let txt = "Tell me the station's id to be eliminated"
+        bot.sendMessage(msg.chat.id, txt)
     }else if (where_i_am == 'name'|| where_i_am == 'region' || where_i_am == 'province'){
         // GET_STATIONS-------------------------------------------------------
         axios.get(URL + '/stations/'+where_i_am+'/'+msg.text.toString())
@@ -199,7 +195,58 @@ bot.on('message', (msg) => {
         });
         //-----------------------------------------------------------------------
         where_i_am = 'Inside'
+    }else if(where_i_am == '➕Add'){
+        // PROOF GET_ADD_STATION--------------------------------------------------
+        let stationInfo = msg.text.toString().split(" ")
+        let header = { headers: { 'Authorization': "bearer " + TKN_Log} }
+        let req = { Nome: stationInfo[0],
+            Comune: stationInfo[1],
+            Provincia: stationInfo[2],
+            Regione: stationInfo[3],
+            Longitudine: parseFloat(stationInfo[4]),
+            Latitudine: parseFloat(stationInfo[5])
+        }
+        //idopenmap it's unnecessary
+        if(stationInfo.length == 7){
+            req.ID_OpenStreetMap = parseInt(stationInfo[6])
+        }
+        axios.post(URL + '/stations/', req, header)
+        .then((response) => {
+            let station     = response.data.addedStation
+            let station_txt = "REGION: " + station.Regione + "\n" +
+                              "PROVINCE: " + station.Provincia + "\n" +
+                              "MUNICIPALITY: " +  station.Comune + "\n" +
+                              "NAME: " + station.Nome + "\n" +
+                              "with ID: " + station._id
+            let txt = "Here is the new station: \n"
+            bot.sendMessage(msg.chat.id, txt + station_txt)
+            bot.sendLocation(msg.chat.id, station.Latitudine, station.Longitudine);
+        });
+        //------------------------------------------------------------------------
+    }else if (where_i_am == '❌Delete'){
+        // PROOF GET_DELETE_STATION--------------------------------------------------
+        let header = { headers: { 'Authorization': "bearer " + TKN_Log} }
+        
+        axios.delete(URL + '/stations/'+msg.text.toString(), header)
+        .then((response) => {
+            let txt = "Station successfully deleted"
+            bot.sendMessage(msg.chat.id, txt)
+            where_i_am = "Inside"
+        }).catch((error) => {
+            if(error.response.data.message.toString().includes("token_error")){
+                let txt = 'Session expired';
+                bot.sendMessage(msg.chat.id, txt, opts_after_signup);
+                where_i_am = "Start"
+            }else{
+                let txt = 'ID error retry';
+                bot.sendMessage(msg.chat.id, txt, opts_keyboard);
+                where_i_am = "Inside"
+            }
+
+        })
+        //------------------------------------------------------------------------
     }
+    
 });
 
 
