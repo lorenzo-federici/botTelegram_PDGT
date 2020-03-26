@@ -20,7 +20,9 @@
   "dependencies": {
     "axios": "^0.19.2",
     "dotenv": "^8.2.0",
+    "geo-distance": "^0.2.0",
     "node-telegram-bot-api": "^0.40.0",
-    "nodemon": "^2.0.2"
+    "nodemon": "^2.0.2",
+    "opn": "^6.0.0"
   }
 }
