@@ -9,8 +9,10 @@ const URL     = 'https://progetto-pdgt-federici.herokuapp.com'
 
 let where_i_am = "Start";  //FLAG status
 let TKN_Log    = ""
+let ID_USER    = ""
 let header     = {}
 let updateOPT  = {}
+let isAdmin    = false
 
 const bot = new TelegramBot(TKN_BOT, {polling: true});
 
@@ -61,10 +63,22 @@ const opts_view_station = {
         ]
     }
 }
-const opts_keyboard = {
+//user 
+const opts_keyboard_user = {
     "reply_markup": {
         "keyboard": [
-            ["🚂View stations", "📍View nearest station"], ["➕Add station", "📝Modify station"], ["❌Delete station"]
+            ["🚂View stations", "📍View nearest station"], 
+            ["🔚Logout", "❌👤Delete me"]
+        ]
+    }
+}
+//admin
+const opts_keyboard_admin = {
+    "reply_markup": {
+        "keyboard": [
+            ["🚂View stations", "📍View nearest station"],
+            ["➕Add station", "📝Modify station", "❌Delete station"],
+            ["🔍View User", "🔚Logout"]
         ]
     }
 }
@@ -95,7 +109,10 @@ bot.onText(/\/options/, (msg, match) => {
     if(where_i_am != 'Start'){
         where_i_am = 'Inside'
         let txt = 'Choose what you want'
-        bot.sendMessage(msg.chat.id, txt, opts_keyboard)
+        if(isAdmin)
+            bot.sendMessage(msg.chat.id, txt, opts_keyboard_admin)
+        else
+            bot.sendMessage(msg.chat.id, txt, opts_keyboard_user)
     }else{
         let txt = 'You must register or Login: ';
         bot.sendMessage(msg.chat.id, txt, opts_start);
@@ -137,6 +154,7 @@ bot.on('callback_query', function onCallbackQuery(example){
 bot.on('message', (msg) => {
 
     if (where_i_am == 'Login'){
+        isAdmin = false
         // LOGIN-----------------------------------------------------------------
         let userInfo = msg.text.toString().split(" ")
         axios.post(URL + '/users/login', {
@@ -146,9 +164,18 @@ bot.on('message', (msg) => {
         .then((response) => {
             where_i_am = "Inside"
             TKN_Log = response.data.token
+            ID_USER = response.data._id
+            
+            if(userInfo[0].toLowerCase().includes("admin@sts.it"))
+                isAdmin = true
+            
             let txt1 = 'TOP you\'re in :)'
             let txt2 = '\n\nChoose what you want: '
-            bot.sendMessage(msg.chat.id, txt1+txt2, opts_keyboard)
+            //bot.sendMessage(msg.chat.id, txt1+txt2, opts_keyboard)
+            if(isAdmin)
+                bot.sendMessage(msg.chat.id, txt1+txt2, opts_keyboard_admin)
+            else
+                bot.sendMessage(msg.chat.id, txt1+txt2, opts_keyboard_user)
         },(error) => {
             where_i_am = "Start"
             let txt1 = 'Authentication failed try again:\n';
@@ -168,9 +195,9 @@ bot.on('message', (msg) => {
             let txt = 'Registered successfully now try to log in';
             bot.sendMessage(msg.chat.id, txt, opts_after_signup)
         },(error) => {
-            let txt1 = 'Authentication failed try again:\n';
-            let txt2 = 'You must write your email and password divided by a space'
-            bot.sendMessage(msg.chat.id, txt1+txt2, opts_start)
+            //let txt1 = 'Authentication failed try again:\n';
+            let txt2 = '\n\nYou must write your email and password divided by a space'
+            bot.sendMessage(msg.chat.id, error.response.data.message+txt2, opts_start)
         });
         //------------------------------------------------------------------------
     }else if (where_i_am == 'Inside'){
@@ -199,6 +226,36 @@ bot.on('message', (msg) => {
 
             let txt = "Tell me the station's id to be eliminated"
             bot.sendMessage(msg.chat.id, txt)
+        }else if (msg.text.toString().includes("🔚Logout")){
+            TKN_Log = "";
+            where_i_am = "Start";
+            let txt = 'See you soon';
+            bot.sendMessage(msg.chat.id, txt);
+        }else if(msg.text.toString().includes("❌👤Delete")){
+            let header = { headers: { 'Authorization': "bearer " + TKN_Log} }
+            // GET_DELETE_STATION-----------------------------------------------------
+            axios.delete(URL + '/users/'+ID_USER, header)
+            .then((response) => {
+                where_i_am = "Start"
+                bot.sendMessage(msg.chat.id, response.data.message)
+            }).catch((error) => {
+                if(error.response.data.message.toString().includes("token_error")){
+                    where_i_am = "Start"
+                    let txt = 'Session expired';
+                    bot.sendMessage(msg.chat.id, txt, opts_after_signup);
+                }else{
+                    where_i_am = "Inside"
+                    bot.sendMessage(msg.chat.id, error.response.data.message, opts_keyboard_admin);
+                }
+
+            })
+            //------------------------------------------------------------------------  
+        }else if(msg.text.toString().includes("🔍View User")){
+            let header = { headers: { 'Authorization': "bearer " + TKN_Log} }
+            axios.get(URL + '/users/', header)
+            .then((response) => {
+                getUser(msg.chat.id, response.data.count, response.data.user)
+            });
         }
 
     }else if (where_i_am == 'name'|| where_i_am == 'region' || where_i_am == 'province'){
@@ -239,27 +296,32 @@ bot.on('message', (msg) => {
             bot.sendMessage(msg.chat.id, txt + station_txt)
             bot.sendLocation(msg.chat.id, station.Latitudine, station.Longitudine);
         }) .catch( (error) =>  {
-            console.log(error);
-            bot.sendMessage(msg.chat.id, "Request erorr retry")
+            if(error.response.data.message.toString().includes("token_error")){
+                let txt = 'Session expired';
+                bot.sendMessage(msg.chat.id, txt, opts_after_signup);
+                where_i_am = "Start"
+            }else{
+                let txt = 'Request error retry';
+                bot.sendMessage(msg.chat.id, txt, opts_keyboard_admin);
+            }
         })
         //------------------------------------------------------------------------
     }else if (where_i_am == '❌Delete'){
+        where_i_am = "Inside"
         // PROOF GET_DELETE_STATION--------------------------------------------------
         let header = { headers: { 'Authorization': "bearer " + TKN_Log} }
         
         axios.delete(URL + '/stations/'+msg.text.toString(), header)
         .then((response) => {
             bot.sendMessage(msg.chat.id, response.data.message)
-            where_i_am = "Inside"
         }).catch((error) => {
             if(error.response.data.message.toString().includes("token_error")){
+                where_i_am = "Start"
                 let txt = 'Session expired';
                 bot.sendMessage(msg.chat.id, txt, opts_after_signup);
-                where_i_am = "Start"
             }else{
                 let txt = 'ID error retry';
-                bot.sendMessage(msg.chat.id, txt, opts_keyboard);
-                where_i_am = "Inside"
+                bot.sendMessage(msg.chat.id, txt, opts_keyboard_admin);
             }
 
         })
@@ -297,32 +359,82 @@ bot.on('message', (msg) => {
 
         axios.patch(URL + '/stations/' + stationInfo[0], req, header)
         .then((response) => {
-            console.log(response.data)
+            //console.log(response.data)
+            bot.sendMessage(msg.chat.id, response.data.message)
         })
         .catch( (error) =>  {
-            console.log(error);
-            bot.sendMessage(msg.chat.id, "Request erorr retry")
+            if(error.response.data.message.toString().includes("token_error")){
+                where_i_am = "Start"
+                let txt = 'Session expired';
+                bot.sendMessage(msg.chat.id, txt, opts_after_signup);
+            }else{
+                let txt = 'Request error retry';
+                bot.sendMessage(msg.chat.id, txt, opts_keyboard_admin);
+            }
         })
+    }else if (where_i_am == 'Start'){
+        let user_msg = msg.text.toString()
+        let cond =  (user_msg.includes("🚂View") ||
+                    user_msg.includes("📍View") ||
+                    user_msg.includes("➕Add") ||
+                    user_msg.includes("📝Modify") ||
+                    user_msg.includes("❌Delete") ||
+                    user_msg.includes("🔚Logout") ||
+                    user_msg.includes("❌👤Delete") ||
+                    user_msg.includes("🔍View User"))
+        if (cond){
+            let txt = 'You must register or Login: ';
+            bot.sendMessage(msg.chat.id, txt, opts_start);
+        }
     }
    
 });
 
 function getStation(idchat, n_stations, stations){
     let stations_txt = ""
+    let txt          = ""
     if (n_stations > 1){
-        for(let i = 0; i < n_stations; i++){
-        stations_txt =  stations_txt + (i+1) + ") " +
-                        stations[i].Regione + 
-                        ": " + stations[i].Nome + " \n\n"
+    
+        if(isAdmin){
+            for(let i = 0; i < n_stations; i++){
+                stations_txt =  stations_txt + (i+1) + ") " +
+                                stations[i].Regione + 
+                                ": " + stations[i].Nome + " \n" +
+                                "ID:   "+stations[i]._id+ " \n\n"
+            }
+        }else{
+            for(let i = 0; i < n_stations; i++){
+                stations_txt =  stations_txt + (i+1) + ") " +
+                                stations[i].Regione + 
+                                ": " + stations[i].Nome + " \n\n"
+            }
         }
-        let txt = "Here are all the " + n_stations + " stations: \n\n" + stations_txt
+        txt = "Here are all the " + n_stations + " stations: \n\n" + stations_txt
         bot.sendMessage(idchat, txt)
     }else if(n_stations = 1){
-        let txt = "Here is the point of " + stations[0].Nome + "'s station"
+        txt = "Here is the point of " + stations[0].Nome + "'s station"
+        if(isAdmin){
+            txt = txt + "\n\nWith ID:"+stations[0]._id
+        }
         bot.sendMessage(idchat, txt);
         bot.sendLocation(idchat, stations[0].Latitudine, stations[0].Longitudine);
     }else{
         let txt = "No station found"
+        bot.sendMessage(idchat, txt);
+    }
+}
+
+function getUser(idchat, n_users, users){
+    let users_txt = ""
+    if (n_users >= 1){
+        for(let i = 0; i < n_users; i++){
+            users_txt = users_txt + (i+1) + ") " +
+                        users[i].email + " \n\n"
+        }
+        let txt = "Here are all the " + n_users + " users: \n\n" + users_txt
+        bot.sendMessage(idchat, txt)
+    }else{
+        let txt = "No user found"
         bot.sendMessage(idchat, txt);
     }
 }
@@ -332,15 +444,11 @@ bot.on('location', (msg) => {
     let latitude = msg.location.latitude
     let longitude = msg.location.longitude
 
-    //console.log(latitude)
-    //console.log(longitude)
-
     where_i_am = 'Inside'
 
     let urlview = URL+'/stations/near/?lat='+latitude+'&long='+longitude
     axios.get(urlview)
     .then((response) =>{
-        //console.log(response.data);
         let txt = response.data.Nome + "'s station is the one closest to you.\nDistance: " + response.data.Distanza
         bot.sendMessage(msg.chat.id, txt);
         bot.sendLocation(msg.chat.id, response.data.Latitudine, response.data.Longitudine)
