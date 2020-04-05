@@ -203,7 +203,7 @@ bot.on('message', (msg) => {
     }else if (where_i_am == 'Inside'){
 
         if(msg.text.toString().includes("🚂View")){
-            let txt = 'Choose what you want to view the satations';
+            let txt = 'Choose what you want:';
             bot.sendMessage(msg.chat.id, txt, opts_view_station);
         }else if(msg.text.toString().includes("📍View")){ 
             bot.sendMessage(msg.chat.id, "Share me your position ", opts_location) 
@@ -263,7 +263,20 @@ bot.on('message', (msg) => {
         axios.get(URL + '/stations/view/'+where_i_am+'?prm='+msg.text.toString())
         .then((response) => {
             getStation(msg.chat.id, response.data.count, response.data.stations)
-        });
+        }).catch((error) => {
+            if(error.response.data.message.toString().includes("token_error")){
+                where_i_am = "Start"
+                let txt = 'Session expired';
+                bot.sendMessage(msg.chat.id, txt, opts_after_signup);
+            }else{
+                let txt = msg.text.toString() + 'error retry';
+                if(isAdmin)
+                    bot.sendMessage(msg.chat.id, txt, opts_keyboard_admin)
+                else
+                    bot.sendMessage(msg.chat.id, txt, opts_keyboard_user)
+            }
+
+        })
         //-----------------------------------------------------------------------
         where_i_am = 'Inside'
     }else if(where_i_am == '➕Add'){
@@ -411,14 +424,14 @@ function getStation(idchat, n_stations, stations){
         }
         txt = "Here are all the " + n_stations + " stations: \n\n" + stations_txt
         bot.sendMessage(idchat, txt)
-    }else if(n_stations = 1){
+    }else if(n_stations == 1){
         txt = "Here is the point of " + stations[0].Nome + "'s station"
         if(isAdmin){
             txt = txt + "\n\nWith ID:"+stations[0]._id
         }
         bot.sendMessage(idchat, txt);
         bot.sendLocation(idchat, stations[0].Latitudine, stations[0].Longitudine);
-    }else{
+    }else if(n_stations == 0){
         let txt = "No station found"
         bot.sendMessage(idchat, txt);
     }
@@ -444,18 +457,19 @@ bot.on('location', (msg) => {
     let latitude = msg.location.latitude
     let longitude = msg.location.longitude
 
-    where_i_am = 'Inside'
-
     let urlview = URL+'/stations/near/?lat='+latitude+'&long='+longitude
+    console.log(urlview)
     axios.get(urlview)
     .then((response) =>{
         let txt = response.data.Nome + "'s station is the one closest to you.\nDistance: " + response.data.Distanza
         bot.sendMessage(msg.chat.id, txt);
         bot.sendLocation(msg.chat.id, response.data.Latitudine, response.data.Longitudine)
+        where_i_am = 'Inside'
     })
     .catch( (error) =>  {
         console.log(error);
         bot.sendMessage(msg.chat.id, "Request erorr retry")
+        where_i_am = 'Inside'
     })
     
 });
