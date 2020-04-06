@@ -41,13 +41,31 @@ const opts_after_signup = {
         ]
     }
 }
-const opts_view_station = {
+const opts_view_station_user = {
     "reply_markup": {
         "inline_keyboard": [
             [{
                 "text": "View All station"
                 ,"callback_data": "all"            
             }], 
+            [{
+                "text": "View by name "
+                ,"callback_data": "name"            
+            }], 
+            [{
+                "text": "View by region "
+                ,"callback_data": "region"            
+            }], 
+            [{
+                "text": "View by province "
+                ,"callback_data": "province"            
+            }]
+        ]
+    }
+}
+const opts_view_station_admin = {
+    "reply_markup": {
+        "inline_keyboard": [
             [{
                 "text": "View by name "
                 ,"callback_data": "name"            
@@ -136,7 +154,9 @@ bot.on('callback_query', function onCallbackQuery(example){
         axios.get(URL + '/stations/view/all')
         .then((response) => {
             getStation(msg.chat.id, response.data.count, response.data.stations)
-        });
+        }).catch( (error) =>  {
+            console.log(error);
+        })
         //-----------------------------------------------------------------------
     }else if (action == 'name' && where_i_am == 'Inside'){
         where_i_am = action;
@@ -204,7 +224,10 @@ bot.on('message', (msg) => {
 
         if(msg.text.toString().includes("🚂View")){
             let txt = 'Choose what you want:';
-            bot.sendMessage(msg.chat.id, txt, opts_view_station);
+            if(isAdmin)
+                bot.sendMessage(msg.chat.id, txt, opts_view_station_admin);
+            else
+                bot.sendMessage(msg.chat.id, txt, opts_view_station_user);
         }else if(msg.text.toString().includes("📍View")){ 
             bot.sendMessage(msg.chat.id, "Share me your position ", opts_location) 
             where_i_am = "location"
