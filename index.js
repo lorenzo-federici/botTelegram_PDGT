@@ -119,7 +119,10 @@ bot.onText(/\/start/, (msg, match) => {
         bot.sendMessage(msg.chat.id, txt, opts_start);
     }else{
         let txt = 'You are allredy in.\nChoose what you want';
-        bot.sendMessage(msg.chat.id, txt, opts_keyboard);
+        if(isAdmin)
+            bot.sendMessage(msg.chat.id, txt, opts_keyboard_admin)
+        else
+            bot.sendMessage(msg.chat.id, txt, opts_keyboard_user)
     }
 });
 
